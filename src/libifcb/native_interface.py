@@ -100,7 +100,8 @@ class ROIList(list):
     def _append_roi(self, definition):
         self.__definitions.append(definition)
     def __setitem__(self, index, value):
-        #list.__setitem__(self, index, Thing(value))
+        raise RuntimeException("ROIList is read only")
+    def __getitem__(self, index, value):
         raise RuntimeException("ROIList is read only")
     def __len__(self):
         return len(self.__definitions)
@@ -108,6 +109,14 @@ class ROIList(list):
     def get_offset(self, index):
         cdef = self.__definitions[index]
         return (cdef[3], cdef[4])
+    def __iter__(self):
+        self.__iter_idx = 0
+        return self
+    def __next__(self):
+        self.__iter_idx += 1
+        if self.__iter_idx > len(self.__definitions):
+            raise StopIteration
+        return self.__getitem__(self.__iter_idx-1)
     def __getitem__(self, index):
         cdef = self.__definitions[index]
         if cdef is None:
@@ -134,6 +143,7 @@ class ROIReader:
         str_inter = str_inter.replace("DAQ", "DAQ_")
         str_inter = str_inter.replace("PMT", "PMT_")
         str_inter = str_inter.replace("TCP", "TCP_")
+        str_inter = str_inter.replace("ROI", "ROI_")
         str_inter = str_inter.replace("UV", "UV_")
         str_inter = str_inter.replace("HKTRIGGER", "HK_Trigger_")
         str_inter = str_inter.replace("grabtimestart", "Grab_Time_Start")
