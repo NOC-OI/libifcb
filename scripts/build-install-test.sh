@@ -5,6 +5,8 @@ cd ..
 bash scripts/get-test-data.sh
 mkdir -p dist
 mkdir -p testout
+rm dist/*
+rm testout/*
 python3 -m build
 pip install --ignore-installed --no-deps dist/libifcb*.whl
 python3 scripts/test.py
