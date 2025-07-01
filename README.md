@@ -14,9 +14,9 @@ for trigger in sample.triggers:
     print(json.dumps(trigger.raw, indent=4)) # We can also dump raw trigger data as dictionaries
 print(str(len(sample1.rois)) + " ROIs") # How many actual ROIs did we get?
 
-sample.rois[1899].save("testout/D20140117T003426_IFCB014_02177.png") # This list only contains valid ROIs - indexes will not match with other software!
-sample.rows[2176].save("testout/D20140117T003426_IFCB014_02177.tiff") # ADC row indexes start from one, but we start from zero to be pythonic - This will return None types for 0-ROI triggers!
-sample.triggers[2102].rois[0].save("testout/D20140117T003426_IFCB014_02177.jpeg") # As do trigger indexes, this is trigger #2103
+sample.rois[1899].image.save("testout/D20140117T003426_IFCB014_02177.png") # This list only contains valid ROIs - indexes will not match with other software!
+sample.rows[2176].image.save("testout/D20140117T003426_IFCB014_02177.tiff") # ADC row indexes start from one, but we start from zero to be pythonic - This will return None types for 0-ROI triggers!
+sample.triggers[2102].rois[0].image.save("testout/D20140117T003426_IFCB014_02177.jpeg") # As do trigger indexes, this is trigger #2103
 
 #NB: These are not standard python lists. Image data is only extracted when requested. Image data is extracted as PIL images.
 ```

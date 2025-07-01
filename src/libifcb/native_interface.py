@@ -30,102 +30,36 @@ import csv
 import struct
 import json
 from PIL import Image
-from PIL.TiffImagePlugin import ImageFileDirectory_v2
 import numpy as np
 from .utils import to_snake_case
-
-
-def extract_images(target, no_metadata = False):
-    header_lines = ""
-    with open(target + ".hdr") as f:
-        header_lines = f.readlines()
-    metadata = header_file_to_dict(header_lines)
-    #print(metadata)
-
-    adc_format_map = list(csv.reader([metadata["adc_file_format"]], skipinitialspace=True))[0]
-    image_map = []
-    outputs = []
-
-
-    if not no_metadata:
-        with open(target + ".json", "w") as f:
-            json.dump(metadata, f, ensure_ascii=False)
-        outputs.append(target + ".json")
-    with open(target + ".adc") as csvfile:
-        reader = csv.DictReader(csvfile, fieldnames=adc_format_map, skipinitialspace=True)
-        adc_data = []
-        for row in reader:
-            adc_data_row = {}
-            for key in row:
-                adc_data_row[to_snake_case_ifcb_preprocess(key)] = row[key]
-            adc_data.append(adc_data_row)
-        with open(target + ".roi", "rb") as imagefile:
-            for row in adc_data:
-                #print(row)
-                imagefile.seek(int(row["start_byte"]))
-                height = int(row["roi_height"])
-                width = int(row["roi_width"])
-                imdata = imagefile.read(height * width)
-                if (height * width > 0):
-                    imdata_reform = np.reshape(np.frombuffer(imdata, dtype=np.uint8), (height, width))
-                    image = Image.fromarray(imdata_reform, "L")
-                    image_package = {"metadata": row, "image": image}
-                    image_map.append(image_package)
-                    im_metadata = {}
-                    for col_key in row:
-                        #sanitised_col_key = re.sub(r"[^A-Za-z0-9_-]", "", col_key) # not neccesary now we do sanitization earlier
-                        #print(sanitised_col_key)
-                        #print(row[col_key])
-                        im_metadata[col_key] = row[col_key]
-                    trigger_number = str(row["trigger_number"])
-                    if not no_metadata:
-                        with open(target + "_TN" + trigger_number + ".json", "w") as f:
-                            json.dump(im_metadata, f, ensure_ascii=False)
-                        outputs.append(target + "_TN" + trigger_number + ".json")
-                    image.save(target + "_TN" + trigger_number + ".tiff", "TIFF")
-                    outputs.append(target + "_TN" + trigger_number + ".tiff")
-    return outputs
 
 class TriggerEvent:
     def __init__(self, raw, rois):
         self.raw = raw
         self.rois = rois
 
-class ROIList(list):
-    def __init__(self, roi_fp):
+class ROI:
+    def __init__(self, roi_fp, fp_offset, w, h, x, y):
         self.__roi_fp = roi_fp
-        self.__definitions = []
-    def append(self, value):
-        raise RuntimeException("ROIList is indented to be read only")
-    def _append_roi(self, definition):
-        self.__definitions.append(definition)
-    def __setitem__(self, index, value):
-        raise RuntimeException("ROIList is read only")
-    def __getitem__(self, index, value):
-        raise RuntimeException("ROIList is read only")
-    def __len__(self):
-        return len(self.__definitions)
-    # Returns X,Y of ROI (this data isn't really useful but it's something someone might want to extract)
-    def get_offset(self, index):
-        cdef = self.__definitions[index]
-        return (cdef[3], cdef[4])
-    def __iter__(self):
-        self.__iter_idx = 0
-        return self
-    def __next__(self):
-        self.__iter_idx += 1
-        if self.__iter_idx > len(self.__definitions):
-            raise StopIteration
-        return self.__getitem__(self.__iter_idx-1)
-    def __getitem__(self, index):
-        cdef = self.__definitions[index]
-        if cdef is None:
+        self.__fp_offset = fp_offset
+        self.x = x
+        self.y = y
+        self.width = w
+        self.height = h
+
+    def __get_image(self):
+        if self.__roi_fp is None:
             return None
-        self.__roi_fp.seek(cdef[0])
-        imdata = self.__roi_fp.read(cdef[1] * cdef[2])
-        imdata_reform = np.reshape(np.frombuffer(imdata, dtype=np.uint8), (cdef[2], cdef[1]))
+        self.__roi_fp.seek(self.__fp_offset)
+        imdata = self.__roi_fp.read(self.width * self.height)
+        imdata_reform = np.reshape(np.frombuffer(imdata, dtype=np.uint8), (self.height, self.width))
         image = Image.fromarray(imdata_reform, "L")
         return image
+
+    image = property(
+            fget = __get_image,
+            doc = "Dynamically generated image object"
+        )
 
 class ROIReader:
     # header = {}
@@ -195,21 +129,21 @@ class ROIReader:
             hdr_fp.close()
 
         trigger_list = {}
-        self.rows = ROIList(roi_fp)
-        self.rois = ROIList(roi_fp)
+        self.rows = []
+        self.rois = []
         for adc_row in self.adc_data:
             tn = adc_row["trigger_number"]
             if tn not in trigger_list:
                 trigger_list[tn] = {}
-                trigger_list[tn]["rois"] = ROIList(roi_fp)
+                trigger_list[tn]["rois"] = []
             trigger_list[tn]["raw_properties"] = adc_row
             if int(adc_row["roi_x"]) != 0:
-                roi_def = (int(adc_row["start_byte"]),int(adc_row["roi_width"]),int(adc_row["roi_height"]),int(adc_row["roi_x"]),int(adc_row["roi_y"]))
-                trigger_list[tn]["rois"]._append_roi(roi_def)
-                self.rois._append_roi(roi_def)
-                self.rows._append_roi(roi_def)
+                roi_def = ROI(roi_fp, int(adc_row["start_byte"]),int(adc_row["roi_width"]),int(adc_row["roi_height"]),int(adc_row["roi_x"]),int(adc_row["roi_y"]))
+                trigger_list[tn]["rois"].append(roi_def)
+                self.rois.append(roi_def)
+                self.rows.append(roi_def)
             else:
-                self.rows._append_roi(None)
+                self.rows.append(ROI(None, 0, 0, 0, 0, 0))
 
         self.triggers = []
         for trigger_idx in trigger_list.keys():
