@@ -34,18 +34,22 @@ import numpy as np
 from .utils import to_snake_case
 
 class TriggerEvent:
-    def __init__(self, raw, rois):
+    def __init__(self, raw, rois, index):
         self.raw = raw
         self.rois = rois
+        self.index = index
 
 class ROI:
-    def __init__(self, roi_fp, fp_offset, w, h, x, y):
+    def __init__(self, trigger_list, roi_fp, fp_offset, w, h, x, y, index, trigger_index):
+        self.__trigger_list = trigger_list
         self.__roi_fp = roi_fp
         self.__fp_offset = fp_offset
         self.x = x
         self.y = y
         self.width = w
         self.height = h
+        self.index = index
+        self.trigger_index = trigger_index
 
     def __get_image(self):
         if self.__roi_fp is None:
@@ -56,9 +60,19 @@ class ROI:
         image = Image.fromarray(imdata_reform, "L")
         return image
 
+    def __get_trigger(self):
+        if self.__trigger_list is None:
+            return None
+        return self.__trigger_list[self.trigger_index]
+
     image = property(
             fget = __get_image,
             doc = "Dynamically generated image object"
+        )
+
+    trigger = property(
+            fget = __get_trigger,
+            doc = "Dynamically get trigger object"
         )
 
 class ROIReader:
@@ -131,6 +145,8 @@ class ROIReader:
         trigger_list = {}
         self.rows = []
         self.rois = []
+        self.triggers = []
+        roi_index = 1
         for adc_row in self.adc_data:
             tn = adc_row["trigger_number"]
             if tn not in trigger_list:
@@ -138,15 +154,15 @@ class ROIReader:
                 trigger_list[tn]["rois"] = []
             trigger_list[tn]["raw_properties"] = adc_row
             if int(adc_row["roi_x"]) != 0:
-                roi_def = ROI(roi_fp, int(adc_row["start_byte"]),int(adc_row["roi_width"]),int(adc_row["roi_height"]),int(adc_row["roi_x"]),int(adc_row["roi_y"]))
+                roi_def = ROI(self.triggers, roi_fp, int(adc_row["start_byte"]),int(adc_row["roi_width"]),int(adc_row["roi_height"]),int(adc_row["roi_x"]),int(adc_row["roi_y"]), roi_index, int(tn))
                 trigger_list[tn]["rois"].append(roi_def)
                 self.rois.append(roi_def)
                 self.rows.append(roi_def)
             else:
-                self.rows.append(ROI(None, 0, 0, 0, 0, 0))
+                self.rows.append(ROI(self.triggers, None, 0, 0, 0, 0, 0, roi_index, int(tn)))
+            roi_index += 1
 
-        self.triggers = []
         for trigger_idx in trigger_list.keys():
             trigger_def = trigger_list[trigger_idx]
-            te = TriggerEvent(trigger_def["raw_properties"], trigger_def["rois"])
+            te = TriggerEvent(trigger_def["raw_properties"], trigger_def["rois"], int(trigger_idx))
             self.triggers.append(te)

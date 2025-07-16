@@ -8,6 +8,7 @@ mkdir -p testout
 rm dist/*
 rm testout/*
 python3 -m build
-pip install --ignore-installed --no-deps dist/libifcb*.whl
+#pip install --ignore-installed --no-deps dist/libifcb*.whl
+pip install --force-reinstall --no-deps dist/libifcb*.whl
 python3 scripts/test.py
 # python3 -m twin upload --repository testpypi dist/*
