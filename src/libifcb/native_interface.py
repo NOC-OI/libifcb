@@ -1,6 +1,6 @@
 #!/bin/python3
 
-# Copyright 2025, A Baldwin
+# Copyright 2025, A Baldwin, National Oceanography Centre
 #
 # This file is part of libifcb.
 #
@@ -63,7 +63,15 @@ class ROI:
     def __get_trigger(self):
         if self.__trigger_list is None:
             return None
-        return self.__trigger_list[self.trigger_index]
+        try:
+            return self.__trigger_list[self.trigger_index]
+        except IndexError as e:
+            print("INDEX MISS " + str(self.trigger_index))
+            print(self.__roi_fp)
+            print(len(self.__trigger_list))
+            print(self.__trigger_list.keys())
+            return None
+
 
     image = property(
             fget = __get_image,
@@ -145,11 +153,11 @@ class ROIReader:
         trigger_list = {}
         self.rows = []
         self.rois = []
-        self.triggers = []
+        self.triggers = {}
         roi_index = 1
         for adc_row in self.adc_data:
             tn = adc_row["trigger_number"]
-            if tn not in trigger_list:
+            if tn not in trigger_list.keys():
                 trigger_list[tn] = {}
                 trigger_list[tn]["rois"] = []
             trigger_list[tn]["raw_properties"] = adc_row
@@ -165,4 +173,4 @@ class ROIReader:
         for trigger_idx in trigger_list.keys():
             trigger_def = trigger_list[trigger_idx]
             te = TriggerEvent(trigger_def["raw_properties"], trigger_def["rois"], int(trigger_idx))
-            self.triggers.append(te)
+            self.triggers[int(trigger_idx)] = te

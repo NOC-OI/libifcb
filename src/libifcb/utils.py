@@ -1,6 +1,6 @@
 #!/bin/python3
 
-# Copyright 2024, A Baldwin
+# Copyright 2024, A Baldwin, National Oceanography Centre
 #
 # This file is part of libifcb.
 #
