@@ -54,11 +54,15 @@ class ROI:
     def __get_image(self):
         if self.__roi_fp is None:
             return None
+        image = Image.fromarray(self.__get_array(), "L")
+        return image
+
+    def __get_array(self):
+        if self.__roi_fp is None:
+            return None
         self.__roi_fp.seek(self.__fp_offset)
         imdata = self.__roi_fp.read(self.width * self.height)
-        imdata_reform = np.reshape(np.frombuffer(imdata, dtype=np.uint8), (self.height, self.width))
-        image = Image.fromarray(imdata_reform, "L")
-        return image
+        return np.reshape(np.frombuffer(imdata, dtype=np.uint8), (self.height, self.width))
 
     def __get_trigger(self):
         if self.__trigger_list is None:
@@ -76,6 +80,11 @@ class ROI:
     image = property(
             fget = __get_image,
             doc = "Dynamically generated image object"
+        )
+
+    array = property(
+            fget = __get_array,
+            doc = "Dynamically generated data object"
         )
 
     trigger = property(
