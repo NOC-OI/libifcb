@@ -68,7 +68,7 @@ class ROI:
         if self.__trigger_list is None:
             return None
         try:
-            return self.__trigger_list[self.trigger_index]
+            return self.__trigger_list[self.trigger_index - 1] # -1 to account for the fact that IFCB trigger numbers start from 1
         except IndexError as e:
             print("INDEX MISS " + str(self.trigger_index))
             print(self.__roi_fp)
@@ -137,7 +137,8 @@ class ROIReader:
             close_hdr = True
         if type(adc_fp) == str:
             adc_fp = open(adc_fp, "r")
-            close_adc = True
+            self.__close_adc = True
+        self.__adc_fp = adc_fp
         if type(roi_fp) == str:
             roi_fp = open(roi_fp, "rb")
             self.__close_roi = True
@@ -150,36 +151,39 @@ class ROIReader:
         self.__adc_format_map = list(csv.reader([self.header["adc_file_format"]], skipinitialspace=True))[0]
 
         self.adc_data = []
-        reader = csv.DictReader(adc_fp, fieldnames=self.__adc_format_map, skipinitialspace=True)
+        reader = csv.DictReader(self.__adc_fp, fieldnames=self.__adc_format_map, skipinitialspace=True)
         for row in reader:
             adc_data_row = {}
             for key in row:
                 adc_data_row[self.__to_snake_case_ifcb_preprocess(key)] = row[key]
             self.adc_data.append(adc_data_row)
-        if close_adc:
-            hdr_fp.close()
+        #if self.__close_adc:
+        #    adc_fp.close()
+
 
         trigger_list = {}
+        tl_keys = set()
         self.rows = []
         self.rois = []
         self.triggers = {}
         roi_index = 1
         for adc_row in self.adc_data:
-            tn = adc_row["trigger_number"]
-            if tn not in trigger_list.keys():
+            tn = int(adc_row["trigger_number"])
+            if tn not in tl_keys:
                 trigger_list[tn] = {}
                 trigger_list[tn]["rois"] = []
+                tl_keys.add(tn)
             trigger_list[tn]["raw_properties"] = adc_row
             if int(adc_row["roi_x"]) != 0:
-                roi_def = ROI(self.triggers, roi_fp, int(adc_row["start_byte"]),int(adc_row["roi_width"]),int(adc_row["roi_height"]),int(adc_row["roi_x"]),int(adc_row["roi_y"]), roi_index, int(tn))
+                roi_def = ROI(self.triggers, roi_fp, int(adc_row["start_byte"]),int(adc_row["roi_width"]),int(adc_row["roi_height"]),int(adc_row["roi_x"]),int(adc_row["roi_y"]), roi_index, tn)
                 trigger_list[tn]["rois"].append(roi_def)
                 self.rois.append(roi_def)
                 self.rows.append(roi_def)
             else:
-                self.rows.append(ROI(self.triggers, None, 0, 0, 0, 0, 0, roi_index, int(tn)))
+                self.rows.append(ROI(self.triggers, None, 0, 0, 0, 0, 0, roi_index, tn))
             roi_index += 1
 
         for trigger_idx in trigger_list.keys():
             trigger_def = trigger_list[trigger_idx]
-            te = TriggerEvent(trigger_def["raw_properties"], trigger_def["rois"], int(trigger_idx))
-            self.triggers[int(trigger_idx)] = te
+            te = TriggerEvent(trigger_def["raw_properties"], trigger_def["rois"], trigger_idx)
+            self.triggers[trigger_idx - 1] = te
