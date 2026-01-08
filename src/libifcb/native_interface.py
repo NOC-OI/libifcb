@@ -131,6 +131,8 @@ class ROIReader:
         return o_dict
 
     def __init__(self, hdr_fp, adc_fp, roi_fp):
+        #print("Getting ADC format")
+
         close_hdr = False
         if type(hdr_fp) == str:
             hdr_fp = open(hdr_fp, "r")
@@ -150,6 +152,8 @@ class ROIReader:
         self.header = self.__header_file_to_dict(header_lines)
         self.__adc_format_map = list(csv.reader([self.header["adc_file_format"]], skipinitialspace=True))[0]
 
+        #print("Loading ADC data")
+
         self.adc_data = []
         reader = csv.DictReader(self.__adc_fp, fieldnames=self.__adc_format_map, skipinitialspace=True)
         for row in reader:
@@ -157,9 +161,10 @@ class ROIReader:
             for key in row:
                 adc_data_row[self.__to_snake_case_ifcb_preprocess(key)] = row[key]
             self.adc_data.append(adc_data_row)
-        #if self.__close_adc:
-        #    adc_fp.close()
+        if self.__close_adc:
+            adc_fp.close()
 
+        #print("Parsing triggers from ADC data")
 
         trigger_list = {}
         tl_keys = set()
@@ -183,7 +188,11 @@ class ROIReader:
                 self.rows.append(ROI(self.triggers, None, 0, 0, 0, 0, 0, roi_index, tn))
             roi_index += 1
 
+        #print("Formatting trigger list")
+
         for trigger_idx in trigger_list.keys():
             trigger_def = trigger_list[trigger_idx]
             te = TriggerEvent(trigger_def["raw_properties"], trigger_def["rois"], trigger_idx)
             self.triggers[trigger_idx - 1] = te
+
+        #print("ROI Reader Initialised")
